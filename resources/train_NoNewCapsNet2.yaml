@@ -1,0 +1,142 @@
+# use a fixed random seed to guarantee that when you run the code twice you will get the same outcome
+manual_seed: 0
+# model configuration
+model:
+  # model class
+  name: NoNewCapsNet
+  # number of input channels to the model
+  in_channels: 4
+  # number of output channels
+  out_channels: 1
+  # determines the order of operators in a single layer (crg - Conv3d+ReLU+GroupNorm)
+  layer_order: cgr
+  # feature maps scale factor
+  f_maps: 32
+  # number of groups in the groupnorm
+  num_groups: 4
+  # apply element-wise nn.Sigmoid after the final 1x1 convolution, otherwise apply nn.Softmax
+  final_sigmoid: true
+# trainer configuration
+trainer:
+  # path to the checkpoint directory
+  checkpoint_dir: /home/server/github/pytorch-3dunet/checkpoints/step1/
+  # path to latest checkpoint; if provided the training will be resumed from that checkpoint
+  resume: null
+  # fine-tune a given pre-trained model
+  pre_trained: null
+  # output test result model
+  test_model: /home/dell/github/pytorch-3dunet/checkpoints/NoNewNet_Adam_batchsize=2_newdiceloss_DataAug/2019-08-13.21:57_model_NoNewNet/last_checkpoint2.pytorch
+  # how many iterations between validations
+  validate_after_iters: 200
+  # how many iterations between tensorboard logging
+  log_after_iters: 100
+  # max number of epochs
+  epochs: 200
+  # max number of iterations
+  iters: 100000
+  # model with higher eval score is considered better
+  eval_score_higher_is_better: True
+# optimizer configuration
+optimizer:
+  #mode
+  mode: Adam
+  # initial learning rate
+  learning_rate: 0.0001
+  # weight decay
+  weight_decay: 0.00003
+# loss function configuration
+loss:
+  # loss function to be used during training
+  name: ReconstructLoss
+  # A manual rescaling weight given to each class.
+  loss_weight: null
+  # a target value that is ignored and does not contribute to the input gradient
+  ignore_index: null
+# evaluation metric configuration
+eval_metric:
+  name: TwoClassDice
+  # a target label that is ignored during metric evaluation
+  ignore_index: null
+lr_scheduler:
+#  name: CosineAnnealingLR
+#  T_max : 60
+#  eta_min: 0
+  name: MultiStepLR
+  milestones: [180, 240, 300]
+  gamma: 0.5
+#  name: ReduceLROnPlateau
+#  factor: 0.2
+#  patience: 180
+# data loaders co;nfiguration
+loaders:
+  # batch size
+  batch_size: 1
+  # if use Mix Up
+  mixup: True
+  # if use data augment
+  data_aug: True
+  # train patch size given to the network (adapt to fit in your GPU mem, generally the bigger patch the better)
+  train_patch: [32, 64, 64]
+  # train stride between patches
+  train_stride: [8, 16, 16]
+  # validation patch (can be bigger than train patch since there is no backprop)
+  val_patch: [32, 64, 64]
+  # validation stride (validation patches doesn't need to overlap)
+  val_stride: [32, 64, 64]
+  # path to the raw data within the H5
+  raw_internal_path: raw
+  # path to the the label data withtin the H5
+  label_internal_path: label
+  # paths to the training datasets
+  train_path:
+    - '/home/server/BraTS19_preprocessing/training/data_3D_size_160_192_160_res_1.0_1.0_1.0.hdf5'
+  # paths to the validation datasets
+  val_path:
+    - '/home/server/BraTS19_preprocessing/training/data_3D_size_160_192_160_res_1.0_1.0_1.0.hdf5'
+  test_path:
+    - '/home/server/BraTS19_preprocessing/validation/data_3D.hdf5'
+  dataset_path:
+    - '/home/dell/data'
+  pred_path:
+    - '/home/server/BraTS19_preprocessing/validation/'
+  template_path:
+    - '/home/server/BraTS19_preprocessing/training/MixupData.nii.gz'
+  # how many subprocesses to use for data loading
+  num_workers: 0
+  # data transformations/augmentations
+  transformer:
+    train:
+      raw:
+        - name: Normalize
+        - name: RandomFlip
+        - name: RandomRotate
+          # rotate only in ZY only
+          axes: [[2, 1]]
+          angle_spectrum: 15
+          mode: reflect
+        - name: ElasticDeformation
+          spline_order: 3
+        - name: RandomContrast
+        - name: ToTensor
+          expand_dims: true
+      label:
+        - name: RandomFlip
+        - name: RandomRotate
+          # rotate only in ZY only
+          axes: [[2, 1]]
+          angle_spectrum: 15
+          mode: reflect
+        - name: ElasticDeformation
+          spline_order: 0
+        - name: ToTensor
+          expand_dims: true
+          dtype: 'long'
+    test:
+      raw:
+        - name: Normalize
+        - name: ToTensor
+          expand_dims: true
+      label:
+        - name: ToTensor
+          expand_dims: true
+          dtype: 'long'
